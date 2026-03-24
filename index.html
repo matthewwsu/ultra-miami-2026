@@ -8,31 +8,26 @@
 </head>
 <body>
 
-<!-- ══════════════ HOME ══════════════ -->
 <div id="screen-home" class="screen active">
-  <div class="home-logo">
+  <div style="text-align:center;">
     <h1 class="logo">ULTRA 2026</h1>
     <p class="logo-sub">MIAMI &middot; MARCH 27&ndash;29</p>
   </div>
-
   <input class="name-input" id="nameInput" placeholder="Enter your name" maxlength="20" autocomplete="off">
-
   <div class="home-actions">
-    <button class="btn-primary" id="btnTier" disabled>&#9889;&nbsp; TIER LIST</button>
-    <button class="btn-secondary" id="btnQP" disabled>&#127922;&nbsp; QUICK PICK MODE</button>
+    <button class="btn-primary" id="btnTier" disabled>&#9889; TIER LIST</button>
+    <button class="btn-secondary" id="btnQP" disabled>&#127922; QUICK PICK MODE</button>
   </div>
-
-  <div id="savedSection" style="display:none;" class="home-actions" style="gap:0;">
+  <div id="savedSection" style="display:none;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:340px;">
     <p class="saved-label">SAVED RANKINGS</p>
-    <div id="savedChips"></div>
-    <div class="home-secondary">
-      <button class="btn-secondary" id="btnSchedule" style="display:none;">&#128506;&nbsp; MY SCHEDULE</button>
-      <button class="btn-secondary" id="btnCompare" style="display:none;">&#9876;&nbsp; COMPARE</button>
+    <div id="savedChips" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn-secondary" id="btnSchedule" style="display:none;width:auto;padding:10px 16px;font-size:13px;">&#128506; MY SCHEDULE</button>
+      <button class="btn-secondary" id="btnCompare" style="display:none;width:auto;padding:10px 16px;font-size:13px;">&#9876; COMPARE</button>
     </div>
   </div>
 </div>
 
-<!-- ══════════════ QUICK PICK ══════════════ -->
 <div id="screen-qp" class="screen">
   <div class="screen-hdr">
     <div class="hdr-row">
@@ -44,11 +39,8 @@
       <button class="btn-green" id="qpDone">DONE &#10003;</button>
     </div>
     <div class="tab-row" id="qpDayTabs"></div>
-    <div class="qp-progress">
-      <div class="qp-progress-fill" id="qpProgress" style="width:0%"></div>
-    </div>
+    <div class="qp-progress"><div class="qp-progress-fill" id="qpProgress" style="width:0%"></div></div>
   </div>
-
   <div class="qp-arena" id="qpArena">
     <div class="qp-side" id="qpLeft">
       <div class="qp-card" id="qpCardL"></div>
@@ -60,14 +52,12 @@
       <div class="qp-tap-hint">TAP TO PICK</div>
     </div>
   </div>
-
   <div class="qp-footer">
     <button class="btn-back" id="qpSkip" style="padding:9px 22px;">Skip / Tie</button>
-    <button class="btn-back" id="qpSwitchTier" style="padding:9px 16px;font-size:11px;">Switch to Tier List &rarr;</button>
+    <button class="btn-back" id="qpSwitchTier" style="padding:9px 14px;font-size:11px;">Tier List &rarr;</button>
   </div>
 </div>
 
-<!-- ══════════════ TIER LIST ══════════════ -->
 <div id="screen-tier" class="screen">
   <div class="screen-hdr">
     <div class="hdr-row">
@@ -80,23 +70,16 @@
     </div>
     <div class="tab-row" id="tierDayTabs"></div>
   </div>
-
   <div class="tier-wrap" id="tierRows"></div>
-
   <div class="unranked-box" id="unrankedBox">
-    <div class="unranked-hdr">
-      <span>UNRANKED</span>
-      <span id="unrankedCount"></span>
-    </div>
+    <div class="unranked-hdr"><span>UNRANKED</span><span id="unrankedCount"></span></div>
     <div class="unranked-content" id="unrankedContent"></div>
   </div>
-
   <div class="cancel-bar" id="cancelBar" style="display:none;">
-    <button class="btn-danger" id="cancelSelBtn">&#10005;&nbsp; CANCEL</button>
+    <button class="btn-danger" id="cancelSelBtn">&#10005; CANCEL</button>
   </div>
 </div>
 
-<!-- ══════════════ SCHEDULE ══════════════ -->
 <div id="screen-schedule" class="screen">
   <div class="screen-hdr">
     <div class="hdr-row">
@@ -109,7 +92,6 @@
   <div class="sched-wrap" id="schedBody"></div>
 </div>
 
-<!-- ══════════════ COMPARE ══════════════ -->
 <div id="screen-compare" class="screen">
   <div class="screen-hdr">
     <div class="hdr-row">
@@ -121,20 +103,8 @@
   <div class="cmp-wrap" id="cmpBody"></div>
 </div>
 
-<!-- Scripts load in order: data → app → ui → boot -->
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 <script src="js/ui.js"></script>
-<script>
-  // Boot
-  APP.loadUser();
-
-  // Wire up switch-to-tier from quick pick
-  document.getElementById("qpSwitchTier").onclick = function() {
-    UI.goTierList();
-  };
-
-  UI.renderHome();
-</script>
 </body>
 </html>
