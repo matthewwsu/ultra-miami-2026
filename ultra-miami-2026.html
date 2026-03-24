@@ -55,8 +55,25 @@ body::before {
 @keyframes selPulse  { 0%,100% { box-shadow:0 0 0 0 rgba(168,85,247,.5); } 50% { box-shadow:0 0 0 8px rgba(168,85,247,0); } }
 
 /* ── SCREENS ─────────────────────────────────────── */
-.screen { display: none; }
-.screen.active { display: block; animation: fadeUp .22s ease; }
+.screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg);
+  z-index: 1;
+}
+.screen.active {
+  display: block;
+  animation: fadeUp .22s ease;
+}
+#screen-home.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
 
 /* ── LOGO ────────────────────────────────────────── */
 .logo {
@@ -1438,6 +1455,13 @@ function goTierList() {
   APP.activeDay = 'friday';
   APP.sel = null;
   showScreen('screen-tier');
+  // Remove stale buttons so they don't duplicate
+  var old = gid('tierSchedBtn');
+  if (old) old.parentNode.removeChild(old);
+  var oldR = gid('tierResaveBtn');
+  if (oldR) oldR.parentNode.removeChild(oldR);
+  gid('tierSaveBtn').textContent = 'SAVE';
+  gid('tierSaveBtn').classList.remove('saved');
   renderTierHeader();
   renderTierRows();
 }
@@ -1445,15 +1469,38 @@ function goTierList() {
 function renderTierHeader() {
   gid('tierUserLabel').textContent = APP.userName.toUpperCase();
   gid('tierBack').onclick = renderHome;
-  gid('tierSaveBtn').onclick = function() {
+  function doSave() {
     APP.saveUser();
-    gid('tierSaveBtn').textContent = 'SAVED';
+    // Switch SAVE to SAVED ✓ + show RESAVE button next to it
+    gid('tierSaveBtn').textContent = 'SAVED ✓';
     gid('tierSaveBtn').classList.add('saved');
-    setTimeout(function() {
-      gid('tierSaveBtn').textContent = 'SAVE';
-      gid('tierSaveBtn').classList.remove('saved');
-    }, 1500);
-  };
+    gid('tierSaveBtn').onclick = null;
+    if (!gid('tierResaveBtn')) {
+      var rb = document.createElement('button');
+      rb.id = 'tierResaveBtn';
+      rb.className = 'btn-green';
+      rb.style.cssText = 'padding:8px 14px;font-size:12px;letter-spacing:1px;white-space:nowrap;';
+      rb.textContent = 'RESAVE';
+      rb.onclick = function() {
+        APP.saveUser();
+        gid('tierSaveBtn').textContent = 'SAVED ✓';
+        rb.textContent = 'RESAVED ✓';
+        setTimeout(function() { rb.textContent = 'RESAVE'; }, 2000);
+      };
+      gid('tierSaveBtn').parentNode.insertBefore(rb, gid('tierSaveBtn').nextSibling);
+    }
+    // Show schedule button below the tier rows
+    if (!gid('tierSchedBtn')) {
+      var sb = document.createElement('button');
+      sb.id = 'tierSchedBtn';
+      sb.style.cssText = 'display:block;width:calc(100% - 28px);margin:10px 14px 0;padding:13px;font-size:15px;font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:1.5px;border-radius:9px;border:2px solid #22c55e;background:rgba(34,197,94,.12);color:#86efac;cursor:pointer;';
+      sb.textContent = '\uD83D\uDDFA MY SCHEDULE \u2192';
+      sb.onclick = goSchedule;
+      gid('unrankedBox').parentNode.insertBefore(sb, gid('unrankedBox'));
+    }
+    refreshHomeButtons();
+  }
+  gid('tierSaveBtn').onclick = doSave;
   gid('cancelSelBtn').onclick = function() { APP.sel = null; renderTierRows(); };
 
   var tabs = gid('tierDayTabs');
