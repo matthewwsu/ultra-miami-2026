@@ -1,514 +1,437 @@
-// UI Rendering
+// ui.js - All rendering, no object methods, plain functions
 
-var UI = {
+function gid(id) { return document.getElementById(id); }
 
-  esc: function(s) {
-    var d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
-  },
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  var el = gid(id);
+  if (el) el.classList.add('active');
+  window.scrollTo(0, 0);
+}
 
-  show: function(screenId) {
-    document.querySelectorAll(".screen").forEach(function(el) {
-      el.classList.remove("active");
-    });
-    var el = document.getElementById(screenId);
-    if (el) el.classList.add("active");
-    window.scrollTo(0, 0);
-  },
+function htmlEsc(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
 
-  // ────────────────────────────────────────────────
-  // HOME
-  // ────────────────────────────────────────────────
-  renderHome: function() {
-    this.show("screen-home");
-    var self = this;
+// ═══════════════════════ HOME ═══════════════════════
 
-    var inp = document.getElementById("nameInput");
-    var btnTier = document.getElementById("btnTier");
-    var btnQP = document.getElementById("btnQP");
+function renderHome() {
+  showScreen('screen-home');
 
-    inp.value = APP.userName;
-    this.refreshHomeButtons();
+  var inp = gid('nameInput');
+  inp.value = APP.userName;
+  refreshHomeButtons();
 
-    inp.oninput = function() {
-      APP.userName = inp.value.trim();
-      self.refreshHomeButtons();
-    };
-    inp.onkeydown = function(e) {
-      if (e.key === "Enter" && APP.userName) self.goTierList();
-    };
-    btnTier.onclick = function() { self.goTierList(); };
-    btnQP.onclick = function() { self.goQuickPick(); };
+  inp.oninput = function() { APP.userName = inp.value.trim(); refreshHomeButtons(); };
+  inp.onkeydown = function(e) { if (e.key === 'Enter' && APP.userName) goTierList(); };
+  gid('btnTier').onclick = goTierList;
+  gid('btnQP').onclick = goQuickPick;
+  gid('btnSchedule').onclick = goSchedule;
+  gid('btnCompare').onclick = goCompare;
+}
 
-    document.getElementById("btnSchedule").onclick = function() { self.goSchedule(); };
-    document.getElementById("btnCompare").onclick = function() { self.goCompare(); };
+function refreshHomeButtons() {
+  var has = APP.userName.length > 0;
+  gid('btnTier').disabled = !has;
+  gid('btnQP').disabled = !has;
 
-    this.renderSavedChips();
-  },
+  var saved = APP.savedUsers();
+  var sec = gid('savedSection');
 
-  refreshHomeButtons: function() {
-    var has = !!APP.userName;
-    document.getElementById("btnTier").disabled = !has;
-    document.getElementById("btnQP").disabled = !has;
-    var saved = APP.savedUsers();
-    document.getElementById("btnSchedule").style.display = saved.length ? "block" : "none";
-    document.getElementById("btnCompare").style.display = saved.length >= 2 ? "block" : "none";
-  },
-
-  renderSavedChips: function() {
-    var self = this;
-    var saved = APP.savedUsers();
-    var wrap = document.getElementById("savedChips");
-    wrap.innerHTML = "";
+  if (saved.length > 0) {
+    sec.style.display = 'flex';
+    var chips = gid('savedChips');
+    chips.innerHTML = '';
     saved.forEach(function(name) {
-      var chip = document.createElement("button");
-      chip.className = "chip" + (name === APP.userName ? " active" : "");
-      chip.textContent = name;
-      chip.onclick = function() {
-        APP.userName = name;
-        document.getElementById("nameInput").value = name;
-        self.refreshHomeButtons();
-        self.renderSavedChips();
-      };
-      wrap.appendChild(chip);
-    });
-    document.getElementById("savedSection").style.display = saved.length ? "flex" : "none";
-  },
-
-  // ────────────────────────────────────────────────
-  // QUICK PICK
-  // ────────────────────────────────────────────────
-  goQuickPick: function() {
-    if (!APP.userName) return;
-    APP.qp.day = "friday";
-    APP.initQP("friday");
-    this.show("screen-qp");
-    this.renderQP();
-  },
-
-  renderQP: function() {
-    var self = this;
-    var d = APP.qp.day;
-
-    // Day tabs
-    var tabsEl = document.getElementById("qpDayTabs");
-    tabsEl.innerHTML = "";
-    ULTRA.days.forEach(function(day) {
-      var btn = document.createElement("button");
-      btn.className = "tab" + (day === d ? " active" : "");
-      btn.textContent = ULTRA.dayLabels[day];
+      var btn = document.createElement('button');
+      btn.className = 'chip' + (name === APP.userName ? ' active' : '');
+      btn.textContent = name;
       btn.onclick = function() {
-        APP.qp.day = day;
-        APP.initQP(day);
-        self.renderQP();
+        APP.userName = name;
+        gid('nameInput').value = name;
+        refreshHomeButtons();
       };
-      tabsEl.appendChild(btn);
+      chips.appendChild(btn);
     });
+    gid('btnSchedule').style.display = 'inline-block';
+    gid('btnCompare').style.display = saved.length >= 2 ? 'inline-block' : 'none';
+  } else {
+    sec.style.display = 'none';
+  }
+}
 
-    document.getElementById("qpBack").onclick = function() { self.renderHome(); };
-    document.getElementById("qpDone").onclick = function() {
-      APP.applyQPToTiers(d);
-      APP.saveUser();
-      self.goTierList();
-    };
-    document.getElementById("qpSkip").onclick = function() {
-      APP.qp.idx++;
-      self.renderQP();
-    };
+// ═══════════════════════ QUICK PICK ═══════════════════════
 
-    var q = APP.qp.queue;
-    var i = APP.qp.idx;
-    var prog = document.getElementById("qpProgress");
+function goQuickPick() {
+  if (!APP.userName) return;
+  APP.qpDay = 'friday';
+  APP.initQP('friday');
+  showScreen('screen-qp');
+  renderQP();
+}
 
-    if (i >= q.length) {
-      // Done
-      APP.applyQPToTiers(d);
-      APP.saveUser();
-      prog.style.width = "100%";
-      document.getElementById("qpCounter").textContent = "Complete!";
-      document.getElementById("qpArena").innerHTML =
-        '<div class="qp-done">' +
-        '<div class="qp-done-emoji">&#127881;</div>' +
-        '<div class="qp-done-label">' + ULTRA.dayLabels[d] + ' RANKED!</div>' +
-        '<button class="btn-primary" id="qpViewTier">View Tier List &rarr;</button>' +
-        '</div>';
-      document.getElementById("qpViewTier").onclick = function() { self.goTierList(); };
-      return;
+function renderQP() {
+  var d = APP.qpDay;
+  var tabs = gid('qpDayTabs');
+  tabs.innerHTML = '';
+  ULTRA.days.forEach(function(day) {
+    var btn = document.createElement('button');
+    btn.className = 'tab' + (day === d ? ' active' : '');
+    btn.textContent = ULTRA.dayLabels[day];
+    btn.onclick = function() { APP.qpDay = day; APP.initQP(day); renderQP(); };
+    tabs.appendChild(btn);
+  });
+
+  gid('qpBack').onclick = renderHome;
+  gid('qpDone').onclick = function() { APP.applyQPToTiers(d); APP.saveUser(); goTierList(); };
+  gid('qpSkip').onclick = function() { APP.qpIdx++; renderQP(); };
+  gid('qpSwitchTier').onclick = goTierList;
+
+  var q = APP.qpQueue;
+  var i = APP.qpIdx;
+  var prog = gid('qpProgress');
+
+  if (i >= q.length) {
+    APP.applyQPToTiers(d);
+    APP.saveUser();
+    prog.style.width = '100%';
+    gid('qpCounter').textContent = 'Done!';
+    gid('qpArena').innerHTML =
+      '<div class="qp-done">' +
+      '<div class="qp-done-emoji">&#127881;</div>' +
+      '<div class="qp-done-label">' + ULTRA.dayLabels[d] + ' RANKED!</div>' +
+      '<button class="btn-primary" id="qpViewTier" style="width:auto;padding:12px 28px;">View Tier List &rarr;</button>' +
+      '</div>';
+    gid('qpViewTier').onclick = goTierList;
+    return;
+  }
+
+  prog.style.width = Math.round((i / q.length) * 100) + '%';
+  gid('qpCounter').textContent = (i + 1) + ' / ' + q.length;
+
+  var a = q[i][0], b = q[i][1];
+  gid('qpCardL').innerHTML = qpCardHTML(a, d);
+  gid('qpCardR').innerHTML = qpCardHTML(b, d);
+  gid('qpLeft').className = 'qp-side';
+  gid('qpRight').className = 'qp-side';
+
+  gid('qpLeft').onclick = function() {
+    APP.allScores[APP.userName][d][a] = (APP.allScores[APP.userName][d][a] || 0) + 2;
+    gid('qpLeft').classList.add('flash-win');
+    setTimeout(function() { APP.qpIdx++; renderQP(); }, 200);
+  };
+  gid('qpRight').onclick = function() {
+    APP.allScores[APP.userName][d][b] = (APP.allScores[APP.userName][d][b] || 0) + 2;
+    gid('qpRight').classList.add('flash-win');
+    setTimeout(function() { APP.qpIdx++; renderQP(); }, 200);
+  };
+}
+
+function qpCardHTML(artist, day) {
+  var set = ULTRA.getSet(day, artist);
+  var c1 = ULTRA.color1(artist), c2 = ULTRA.color2(artist);
+  return '<div class="qp-avatar" style="background:linear-gradient(135deg,' + c1 + ',' + c2 + ')">' +
+    ULTRA.initials(artist) + '</div>' +
+    '<div class="qp-card-body">' +
+    '<div class="qp-artist-name">' + htmlEsc(artist) + '</div>' +
+    '<div class="qp-stage">' + (set ? htmlEsc(set.s) : '') + '</div>' +
+    '<div class="qp-time">' + (set ? ULTRA.fmtTime(set.t) : 'TBA') + '</div>' +
+    '</div>';
+}
+
+// ═══════════════════════ TIER LIST ═══════════════════════
+
+var TIER_DEFS = [
+  {id:'S',c:'#ff3b3b'},{id:'A',c:'#ff8c00'},{id:'B',c:'#f5c400'},
+  {id:'C',c:'#6fcc3a'},{id:'D',c:'#00bfff'},{id:'F',c:'#9966ff'}
+];
+
+function goTierList() {
+  if (!APP.userName) return;
+  APP.activeDay = 'friday';
+  APP.sel = null;
+  showScreen('screen-tier');
+  renderTierHeader();
+  renderTierRows();
+}
+
+function renderTierHeader() {
+  gid('tierUserLabel').textContent = APP.userName.toUpperCase();
+  gid('tierBack').onclick = renderHome;
+  gid('tierSaveBtn').onclick = function() {
+    APP.saveUser();
+    gid('tierSaveBtn').textContent = 'SAVED';
+    gid('tierSaveBtn').classList.add('saved');
+    setTimeout(function() {
+      gid('tierSaveBtn').textContent = 'SAVE';
+      gid('tierSaveBtn').classList.remove('saved');
+    }, 1500);
+  };
+  gid('cancelSelBtn').onclick = function() { APP.sel = null; renderTierRows(); };
+
+  var tabs = gid('tierDayTabs');
+  tabs.innerHTML = '';
+  ULTRA.days.forEach(function(day) {
+    var btn = document.createElement('button');
+    btn.className = 'tab' + (day === APP.activeDay ? ' active' : '');
+    btn.textContent = ULTRA.dayLabels[day];
+    btn.onclick = function() { APP.activeDay = day; APP.sel = null; renderTierHeader(); renderTierRows(); };
+    tabs.appendChild(btn);
+  });
+  var resetBtn = document.createElement('button');
+  resetBtn.className = 'tab tab-danger';
+  resetBtn.textContent = 'RESET';
+  resetBtn.onclick = function() { APP.resetDay(APP.userName, APP.activeDay); APP.sel = null; renderTierRows(); };
+  tabs.appendChild(resetBtn);
+}
+
+function renderTierRows() {
+  var day = APP.activeDay;
+  var ct = APP.getTiers(APP.userName, day);
+  var sel = APP.sel;
+  var hasSel = !!sel;
+
+  var wrap = gid('tierRows');
+  wrap.innerHTML = '';
+
+  TIER_DEFS.forEach(function(tier) {
+    var isTarget = hasSel && sel.from !== tier.id;
+    var row = document.createElement('div');
+    row.className = 'tier-row' + (isTarget ? ' drop-target' : '');
+
+    var lbl = document.createElement('div');
+    lbl.className = 'tier-lbl';
+    lbl.style.background = tier.c;
+    lbl.textContent = tier.id;
+    if (isTarget) {
+      var glow = document.createElement('div');
+      glow.className = 'tier-lbl-glow';
+      lbl.appendChild(glow);
     }
 
-    prog.style.width = Math.round((i / q.length) * 100) + "%";
-    document.getElementById("qpCounter").textContent = (i + 1) + " / " + q.length;
+    var content = document.createElement('div');
+    content.className = 'tier-content';
 
-    var a = q[i][0], b = q[i][1];
-    document.getElementById("qpCardL").innerHTML = this.qpCardHTML(a, d);
-    document.getElementById("qpCardR").innerHTML = this.qpCardHTML(b, d);
+    if (ct[tier.id].length === 0 && isTarget) {
+      var ph = document.createElement('div');
+      ph.className = 'tier-placeholder';
+      ph.textContent = 'DROP HERE';
+      ph.style.color = tier.c + '77';
+      content.appendChild(ph);
+    }
 
-    var leftEl = document.getElementById("qpLeft");
-    var rightEl = document.getElementById("qpRight");
-    leftEl.className = "qp-side";
-    rightEl.className = "qp-side";
+    ct[tier.id].forEach(function(a) { content.appendChild(makeChip(a, tier.id, hasSel, day)); });
+    row.appendChild(lbl);
+    row.appendChild(content);
+    if (isTarget) { (function(tid) { row.onclick = function() { moveArtist(tid); }; })(tier.id); }
+    wrap.appendChild(row);
+  });
 
-    leftEl.onclick = function() {
-      APP.allScores[APP.userName][d][a] = (APP.allScores[APP.userName][d][a] || 0) + 2;
-      leftEl.classList.add("flash-win");
-      setTimeout(function() { APP.qp.idx++; self.renderQP(); }, 200);
-    };
-    rightEl.onclick = function() {
-      APP.allScores[APP.userName][d][b] = (APP.allScores[APP.userName][d][b] || 0) + 2;
-      rightEl.classList.add("flash-win");
-      setTimeout(function() { APP.qp.idx++; self.renderQP(); }, 200);
-    };
-  },
+  // Unranked
+  var uTarget = hasSel && sel.from !== 'unranked';
+  var ubox = gid('unrankedBox');
+  ubox.className = 'unranked-box' + (uTarget ? ' drop-target' : '');
+  gid('unrankedCount').textContent = ct.unranked.length + ' artists';
+  var uc = gid('unrankedContent');
+  uc.innerHTML = '';
+  ct.unranked.forEach(function(a) { uc.appendChild(makeChip(a, 'unranked', hasSel, day)); });
+  ubox.onclick = uTarget ? function() { moveArtist('unranked'); } : null;
+  gid('cancelBar').style.display = hasSel ? 'flex' : 'none';
+}
 
-  qpCardHTML: function(artist, day) {
-    var set = ULTRA.getSet(day, artist);
-    var c1 = ULTRA.color1(artist), c2 = ULTRA.color2(artist);
-    return '<div class="qp-avatar" style="background:linear-gradient(135deg,' + c1 + ',' + c2 + ')">' +
-      ULTRA.initials(artist) + '</div>' +
-      '<div class="qp-card-body">' +
-      '<div class="qp-artist-name">' + this.esc(artist) + '</div>' +
-      '<div class="qp-stage">' + (set ? this.esc(set.s) : "") + '</div>' +
-      '<div class="qp-time">' + (set ? ULTRA.fmtTime(set.t) : "TBA") + '</div>' +
-      '</div>';
-  },
+function makeChip(name, fromTier, hasSel, day) {
+  var sel = APP.sel;
+  var isSel = sel && sel.a === name && sel.from === fromTier;
+  var dimmed = hasSel && !isSel;
+  var set = ULTRA.getSet(day, name);
+  var c1 = ULTRA.color1(name), c2 = ULTRA.color2(name);
 
-  // ────────────────────────────────────────────────
-  // TIER LIST
-  // ────────────────────────────────────────────────
-  goTierList: function() {
-    if (!APP.userName) return;
-    APP.activeDay = "friday";
-    APP.sel = null;
-    this.show("screen-tier");
-    this.renderTierHeader();
-    this.renderTierRows();
-  },
+  var chip = document.createElement('div');
+  chip.className = 'artist-chip' + (isSel ? ' selected' : '') + (dimmed ? ' dimmed' : '');
+  chip.innerHTML =
+    '<div class="chip-icon" style="background:linear-gradient(135deg,' + c1 + ',' + c2 + ')">' + ULTRA.initials(name) + '</div>' +
+    '<div class="chip-name">' + htmlEsc(name) + '</div>' +
+    '<div class="chip-time">' + (set ? ULTRA.fmtTime(set.t) : '-') + '</div>' +
+    '<div class="chip-stage">' + (set ? htmlEsc(set.s) : '') + '</div>';
 
-  renderTierHeader: function() {
-    var self = this;
-    document.getElementById("tierUserLabel").textContent = APP.userName.toUpperCase();
-    document.getElementById("tierBack").onclick = function() { self.renderHome(); };
-    document.getElementById("tierSaveBtn").onclick = function() {
-      APP.saveUser();
-      var btn = document.getElementById("tierSaveBtn");
-      btn.textContent = "SAVED";
-      btn.classList.add("saved");
-      setTimeout(function() { btn.textContent = "SAVE"; btn.classList.remove("saved"); }, 1500);
-    };
-    document.getElementById("cancelSelBtn").onclick = function() {
-      APP.sel = null;
-      self.renderTierRows();
-    };
-
-    // Day tabs
-    var tabsEl = document.getElementById("tierDayTabs");
-    tabsEl.innerHTML = "";
-    ULTRA.days.forEach(function(day) {
-      var btn = document.createElement("button");
-      btn.className = "tab" + (day === APP.activeDay ? " active" : "");
-      btn.textContent = ULTRA.dayLabels[day];
-      btn.onclick = function() {
-        APP.activeDay = day;
-        APP.sel = null;
-        self.renderTierHeader();
-        self.renderTierRows();
-      };
-      tabsEl.appendChild(btn);
-    });
-
-    // Reset button
-    var resetBtn = document.createElement("button");
-    resetBtn.className = "tab tab-danger";
-    resetBtn.textContent = "RESET";
-    resetBtn.onclick = function() {
-      APP.resetDay(APP.userName, APP.activeDay);
-      APP.sel = null;
-      self.renderTierRows();
-    };
-    tabsEl.appendChild(resetBtn);
-  },
-
-  renderTierRows: function() {
-    var self = this;
-    var day = APP.activeDay;
-    var ct = APP.getTiers(APP.userName, day);
-    var sel = APP.sel;
-    var hasSel = !!sel;
-    var tierDefs = [
-      {id:"S",c:"#ff3b3b"},{id:"A",c:"#ff8c00"},{id:"B",c:"#f5c400"},
-      {id:"C",c:"#6fcc3a"},{id:"D",c:"#00bfff"},{id:"F",c:"#9966ff"}
-    ];
-
-    var wrap = document.getElementById("tierRows");
-    wrap.innerHTML = "";
-
-    tierDefs.forEach(function(tier) {
-      var isTarget = hasSel && sel.from !== tier.id;
-      var row = document.createElement("div");
-      row.className = "tier-row" + (isTarget ? " drop-target" : "");
-
-      var lbl = document.createElement("div");
-      lbl.className = "tier-lbl";
-      lbl.style.background = tier.c;
-      lbl.textContent = tier.id;
-      if (isTarget) {
-        var glow = document.createElement("div");
-        glow.className = "tier-lbl-glow";
-        lbl.appendChild(glow);
-      }
-
-      var content = document.createElement("div");
-      content.className = "tier-content";
-
-      if (ct[tier.id].length === 0 && isTarget) {
-        var ph = document.createElement("div");
-        ph.className = "tier-placeholder";
-        ph.textContent = "DROP HERE";
-        ph.style.color = tier.c + "77";
-        content.appendChild(ph);
-      }
-
-      ct[tier.id].forEach(function(a) {
-        content.appendChild(self.makeArtistChip(a, tier.id, hasSel, day));
-      });
-
-      row.appendChild(lbl);
-      row.appendChild(content);
-      if (isTarget) row.onclick = function() { self.moveArtist(tier.id); };
-      wrap.appendChild(row);
-    });
-
-    // Unranked box
-    var unTarget = hasSel && sel.from !== "unranked";
-    var ubox = document.getElementById("unrankedBox");
-    ubox.className = "unranked-box" + (unTarget ? " drop-target" : "");
-    document.getElementById("unrankedCount").textContent = ct.unranked.length + " artists";
-    var ucontent = document.getElementById("unrankedContent");
-    ucontent.innerHTML = "";
-    ct.unranked.forEach(function(a) {
-      ucontent.appendChild(self.makeArtistChip(a, "unranked", hasSel, day));
-    });
-    if (unTarget) ubox.onclick = function() { self.moveArtist("unranked"); };
-    else ubox.onclick = null;
-
-    // Cancel bar
-    document.getElementById("cancelBar").style.display = hasSel ? "flex" : "none";
-  },
-
-  makeArtistChip: function(name, fromTier, hasSel, day) {
-    var self = this;
-    var sel = APP.sel;
-    var isSel = sel && sel.a === name && sel.from === fromTier;
-    var dimmed = hasSel && !isSel;
-    var set = ULTRA.getSet(day, name);
-    var c1 = ULTRA.color1(name), c2 = ULTRA.color2(name);
-
-    var chip = document.createElement("div");
-    chip.className = "artist-chip" + (isSel ? " selected" : "") + (dimmed ? " dimmed" : "");
-
-    chip.innerHTML =
-      '<div class="chip-icon" style="background:linear-gradient(135deg,' + c1 + ',' + c2 + ')">' +
-      ULTRA.initials(name) + '</div>' +
-      '<div class="chip-name">' + this.esc(name) + '</div>' +
-      '<div class="chip-time">' + (set ? ULTRA.fmtTime(set.t) : "-") + '</div>' +
-      '<div class="chip-stage">' + (set ? this.esc(set.s) : "") + '</div>';
-
+  (function(n, ft, wasSel) {
     chip.onclick = function(e) {
       e.stopPropagation();
-      if (isSel) APP.sel = null;
-      else APP.sel = { a: name, from: fromTier };
-      self.renderTierRows();
+      APP.sel = wasSel ? null : { a: n, from: ft };
+      renderTierRows();
     };
-    return chip;
-  },
+  })(name, fromTier, isSel);
 
-  moveArtist: function(target) {
-    if (!APP.sel) return;
-    var day = APP.activeDay;
-    var ct = APP.getTiers(APP.userName, day);
-    var a = APP.sel.a;
-    var from = APP.sel.from;
-    if (from === "unranked") ct.unranked = ct.unranked.filter(function(x) { return x !== a; });
-    else ct[from] = ct[from].filter(function(x) { return x !== a; });
-    if (target === "unranked") ct.unranked.push(a);
-    else ct[target].push(a);
-    APP.sel = null;
-    this.renderTierRows();
-  },
+  return chip;
+}
 
-  // ────────────────────────────────────────────────
-  // SCHEDULE
-  // ────────────────────────────────────────────────
-  goSchedule: function() {
-    this.show("screen-schedule");
-    APP.activeDay = "friday";
-    this.renderSchedule();
-  },
+function moveArtist(target) {
+  if (!APP.sel) return;
+  var day = APP.activeDay;
+  var ct = APP.getTiers(APP.userName, day);
+  var a = APP.sel.a, from = APP.sel.from;
+  if (from === 'unranked') ct.unranked = ct.unranked.filter(function(x) { return x !== a; });
+  else ct[from] = ct[from].filter(function(x) { return x !== a; });
+  if (target === 'unranked') ct.unranked.push(a);
+  else ct[target].push(a);
+  APP.sel = null;
+  renderTierRows();
+}
 
-  renderSchedule: function() {
-    var self = this;
-    var saved = APP.savedUsers();
-    var user = APP.allTiers[APP.userName] ? APP.userName : saved[0];
+// ═══════════════════════ SCHEDULE ═══════════════════════
 
-    document.getElementById("schedBack").onclick = function() { self.renderHome(); };
+function goSchedule() {
+  showScreen('screen-schedule');
+  APP.activeDay = 'friday';
+  APP.schedFilter = ['S','A','B'];
+  renderSchedule();
+}
 
-    // Day tabs
-    var tabsEl = document.getElementById("schedDayTabs");
-    tabsEl.innerHTML = "";
-    ULTRA.days.forEach(function(day) {
-      var btn = document.createElement("button");
-      btn.className = "tab" + (day === APP.activeDay ? " active" : "");
-      btn.textContent = ULTRA.dayLabels[day];
-      btn.onclick = function() { APP.activeDay = day; self.renderScheduleBody(user); self.renderSchedule(); };
-      tabsEl.appendChild(btn);
-    });
+function renderSchedule() {
+  gid('schedBack').onclick = renderHome;
 
-    // Tier filter
-    var filterEl = document.getElementById("schedFilter");
-    filterEl.innerHTML = "";
-    var tierDefs = [
-      {id:"S",c:"#ff3b3b"},{id:"A",c:"#ff8c00"},{id:"B",c:"#f5c400"},
-      {id:"C",c:"#6fcc3a"},{id:"D",c:"#00bfff"},{id:"F",c:"#9966ff"}
-    ];
-    tierDefs.forEach(function(t) {
-      var on = APP.schedFilter.indexOf(t.id) >= 0;
-      var btn = document.createElement("button");
-      btn.className = "tier-filter-btn" + (on ? " on" : "");
-      btn.textContent = t.id;
-      btn.style.setProperty("--tc", t.c);
-      btn.onclick = function() {
-        var idx = APP.schedFilter.indexOf(t.id);
-        if (idx >= 0) { if (APP.schedFilter.length > 1) APP.schedFilter.splice(idx, 1); }
-        else { APP.schedFilter.push(t.id); }
-        self.renderSchedule();
-      };
-      filterEl.appendChild(btn);
-    });
+  var tabs = gid('schedDayTabs');
+  tabs.innerHTML = '';
+  ULTRA.days.forEach(function(day) {
+    var btn = document.createElement('button');
+    btn.className = 'tab' + (day === APP.activeDay ? ' active' : '');
+    btn.textContent = ULTRA.dayLabels[day];
+    btn.onclick = function() { APP.activeDay = day; renderSchedule(); };
+    tabs.appendChild(btn);
+  });
 
-    this.renderScheduleBody(user);
-  },
+  var filterEl = gid('schedFilter');
+  filterEl.innerHTML = '';
+  var tierColors = {S:'#ff3b3b',A:'#ff8c00',B:'#f5c400',C:'#6fcc3a',D:'#00bfff',F:'#9966ff'};
+  Object.keys(tierColors).forEach(function(tid) {
+    var on = APP.schedFilter.indexOf(tid) >= 0;
+    var btn = document.createElement('button');
+    btn.className = 'tier-filter-btn' + (on ? ' on' : '');
+    btn.textContent = tid;
+    btn.style.setProperty('--tc', tierColors[tid]);
+    btn.onclick = function() {
+      var idx = APP.schedFilter.indexOf(tid);
+      if (idx >= 0) { if (APP.schedFilter.length > 1) APP.schedFilter.splice(idx, 1); }
+      else APP.schedFilter.push(tid);
+      renderSchedule();
+    };
+    filterEl.appendChild(btn);
+  });
 
-  renderScheduleBody: function(user) {
-    var self = this;
-    var wrap = document.getElementById("schedBody");
+  renderScheduleBody();
+}
 
-    if (!user || !APP.allTiers[user]) {
-      wrap.innerHTML = '<div class="empty-msg">Save your tier list first to generate a schedule.</div>';
-      return;
-    }
+function renderScheduleBody() {
+  var saved = APP.savedUsers();
+  var wrap = gid('schedBody');
+  if (!saved.length) {
+    wrap.innerHTML = '<div class="empty-msg">Save your tier list first to generate a schedule.</div>';
+    return;
+  }
+  var user = APP.allTiers[APP.userName] ? APP.userName : saved[0];
+  var result = APP.buildSchedule(user, APP.activeDay, APP.schedFilter);
+  var chosen = result.chosen, conflicts = result.conflicts;
+  var tierColors = {S:'#ff3b3b',A:'#ff8c00',B:'#f5c400',C:'#6fcc3a',D:'#00bfff',F:'#9966ff'};
 
-    var result = APP.buildSchedule(user, APP.activeDay, APP.schedFilter);
-    var chosen = result.chosen;
-    var conflicts = result.conflicts;
-    var tierColors = {S:"#ff3b3b",A:"#ff8c00",B:"#f5c400",C:"#6fcc3a",D:"#00bfff",F:"#9966ff"};
+  if (!chosen.length && !conflicts.length) {
+    wrap.innerHTML = '<div class="empty-msg">No ranked artists in selected tiers for this day.<br>Go rank some artists first!</div>';
+    return;
+  }
 
-    if (!chosen.length && !conflicts.length) {
-      wrap.innerHTML = '<div class="empty-msg">No ranked artists found for selected tiers on this day.<br>Go rank some artists first!</div>';
-      return;
-    }
+  var h = '<div class="sched-meta">' + htmlEsc(user.toUpperCase()) + ' &middot; ' + ULTRA.dayLabels[APP.activeDay] + '</div>';
+  h += '<div class="sched-stats">';
+  h += '<div class="sched-stat green">&#10003; ' + chosen.length + ' sets</div>';
+  if (conflicts.length) h += '<div class="sched-stat orange">&#9889; ' + conflicts.length + ' conflicts</div>';
+  h += '</div>';
+  h += '<div class="sched-section-lbl">YOUR SCHEDULE</div>';
 
-    var html = '<div class="sched-meta">' + this.esc(user.toUpperCase()) + ' &middot; ' + ULTRA.dayLabels[APP.activeDay] + '</div>';
-    html += '<div class="sched-stats">';
-    html += '<div class="sched-stat green">&#10003; ' + chosen.length + ' sets</div>';
-    if (conflicts.length) html += '<div class="sched-stat orange">&#9889; ' + conflicts.length + ' conflicts</div>';
-    html += '</div>';
+  chosen.sort(function(a,b){return a.t-b.t;}).forEach(function(sl, i) {
+    var tc = tierColors[sl.tier] || '#888';
+    h += '<div class="sched-slot" style="animation-delay:' + (i*0.05) + 's">' +
+      '<div class="sched-time">' + ULTRA.fmtTime(sl.t) + '</div>' +
+      '<div class="sched-info">' +
+      '<div class="sched-artist"><span class="tier-pip" style="background:' + tc + '">' + sl.tier + '</span>' + htmlEsc(sl.a) + '</div>' +
+      '<div class="sched-stage">' + htmlEsc(sl.s) + '</div>' +
+      '<div class="sched-until">Until ' + ULTRA.fmtTime(sl.e) + '</div>' +
+      '</div></div>';
+  });
 
-    html += '<div class="sched-section-lbl">YOUR SCHEDULE</div>';
-    chosen.sort(function(a,b){return a.t-b.t;}).forEach(function(slot, i) {
-      var tc = tierColors[slot.tier] || "#888";
-      html += '<div class="sched-slot" style="animation-delay:' + (i * 0.05) + 's">' +
-        '<div class="sched-time">' + ULTRA.fmtTime(slot.t) + '</div>' +
+  if (conflicts.length) {
+    h += '<div class="sched-section-lbl conflict-lbl">&#9889; CONFLICTS</div>';
+    conflicts.sort(function(a,b){return a.t-b.t;}).forEach(function(sl, i) {
+      var tc = tierColors[sl.tier] || '#888';
+      h += '<div class="sched-slot conflict" style="animation-delay:' + ((chosen.length+i)*0.05) + 's">' +
+        '<div class="sched-time dim">' + ULTRA.fmtTime(sl.t) + '</div>' +
         '<div class="sched-info">' +
-        '<div class="sched-artist"><span class="tier-pip" style="background:' + tc + '">' + slot.tier + '</span>' + self.esc(slot.a) + '</div>' +
-        '<div class="sched-stage">' + self.esc(slot.s) + '</div>' +
-        '<div class="sched-until">Until ' + ULTRA.fmtTime(slot.e) + '</div>' +
+        '<div class="sched-artist faded"><span class="tier-pip" style="background:' + tc + '">' + sl.tier + '</span>' + htmlEsc(sl.a) + '</div>' +
+        '<div class="sched-stage">' + htmlEsc(sl.s) + '</div>' +
+        '<div class="conflict-tag">&#9889; overlaps with ' + htmlEsc(sl.clashWith || '') + '</div>' +
         '</div></div>';
     });
+  }
+  wrap.innerHTML = h;
+}
 
-    if (conflicts.length) {
-      html += '<div class="sched-section-lbl conflict-lbl">&#9889; CONFLICTS</div>';
-      conflicts.sort(function(a,b){return a.t-b.t;}).forEach(function(slot, i) {
-        var tc = tierColors[slot.tier] || "#888";
-        html += '<div class="sched-slot conflict" style="animation-delay:' + ((chosen.length + i) * 0.05) + 's">' +
-          '<div class="sched-time dim">' + ULTRA.fmtTime(slot.t) + '</div>' +
-          '<div class="sched-info">' +
-          '<div class="sched-artist faded"><span class="tier-pip" style="background:' + tc + '">' + slot.tier + '</span>' + self.esc(slot.a) + '</div>' +
-          '<div class="sched-stage">' + self.esc(slot.s) + '</div>' +
-          '<div class="conflict-tag">&#9889; overlaps with ' + self.esc(slot.clashWith || "") + '</div>' +
-          '</div></div>';
+// ═══════════════════════ COMPARE ═══════════════════════
+
+function goCompare() {
+  showScreen('screen-compare');
+  APP.activeDay = 'friday';
+  renderCompare();
+}
+
+function renderCompare() {
+  gid('cmpBack').onclick = renderHome;
+  var tabs = gid('cmpDayTabs');
+  tabs.innerHTML = '';
+  ULTRA.days.forEach(function(day) {
+    var btn = document.createElement('button');
+    btn.className = 'tab' + (day === APP.activeDay ? ' active' : '');
+    btn.textContent = ULTRA.dayLabels[day];
+    btn.onclick = function() { APP.activeDay = day; renderCompare(); };
+    tabs.appendChild(btn);
+  });
+  renderCompareBody();
+}
+
+function renderCompareBody() {
+  var saved = APP.savedUsers();
+  var wrap = gid('cmpBody');
+  if (saved.length < 2) {
+    wrap.innerHTML = '<div class="empty-msg">Need 2+ saved rankings to compare.</div>';
+    return;
+  }
+  var u1 = saved[0], u2 = saved[1];
+  var t1 = APP.getTiers(u1, APP.activeDay);
+  var t2 = APP.getTiers(u2, APP.activeDay);
+  var tierIds = ['S','A','B','C','D','F'];
+  var tierColors = {S:'#ff3b3b',A:'#ff8c00',B:'#f5c400',C:'#6fcc3a',D:'#00bfff',F:'#9966ff'};
+  var m1 = {}, m2 = {};
+  tierIds.concat(['unranked']).forEach(function(tid) {
+    (t1[tid]||[]).forEach(function(a){m1[a]=tid;});
+    (t2[tid]||[]).forEach(function(a){m2[a]=tid;});
+  });
+
+  var h = '<div class="cmp-header-row"><div class="cmp-col"><div class="cmp-user-lbl">' + htmlEsc(u1.toUpperCase()) + '</div></div><div class="cmp-col"><div class="cmp-user-lbl">' + htmlEsc(u2.toUpperCase()) + '</div></div></div>';
+  tierIds.forEach(function(tid) {
+    var tc = tierColors[tid];
+    h += '<div class="cmp-row">';
+    [[u1,m2,t1],[u2,m1,t2]].forEach(function(pair) {
+      var om = pair[1], ct = pair[2];
+      h += '<div class="cmp-col"><div class="cmp-tier-row"><div class="cmp-tier-lbl" style="background:' + tc + '">' + tid + '</div><div class="cmp-tier-content">';
+      (ct[tid]||[]).forEach(function(a) {
+        var c1 = ULTRA.color1(a), c2 = ULTRA.color2(a);
+        h += '<div class="cmp-chip"><div class="cmp-icon' + (om[a]===tid?' match':'') + '" style="background:linear-gradient(135deg,' + c1 + ',' + c2 + ')">' + ULTRA.initials(a) + '</div><div class="cmp-name">' + htmlEsc(a) + '</div></div>';
       });
-    }
-
-    wrap.innerHTML = html;
-  },
-
-  // ────────────────────────────────────────────────
-  // COMPARE
-  // ────────────────────────────────────────────────
-  goCompare: function() {
-    this.show("screen-compare");
-    APP.activeDay = "friday";
-    this.renderCompare();
-  },
-
-  renderCompare: function() {
-    var self = this;
-    document.getElementById("cmpBack").onclick = function() { self.renderHome(); };
-
-    var tabsEl = document.getElementById("cmpDayTabs");
-    tabsEl.innerHTML = "";
-    ULTRA.days.forEach(function(day) {
-      var btn = document.createElement("button");
-      btn.className = "tab" + (day === APP.activeDay ? " active" : "");
-      btn.textContent = ULTRA.dayLabels[day];
-      btn.onclick = function() { APP.activeDay = day; self.renderCompareBody(); self.renderCompare(); };
-      tabsEl.appendChild(btn);
+      h += '</div></div></div>';
     });
+    h += '</div>';
+  });
+  wrap.innerHTML = h;
+}
 
-    this.renderCompareBody();
-  },
-
-  renderCompareBody: function() {
-    var wrap = document.getElementById("cmpBody");
-    var saved = APP.savedUsers();
-    if (saved.length < 2) {
-      wrap.innerHTML = '<div class="empty-msg">Need 2+ saved rankings to compare.</div>';
-      return;
-    }
-    var u1 = saved[0], u2 = saved[1];
-    var t1 = APP.getTiers(u1, APP.activeDay);
-    var t2 = APP.getTiers(u2, APP.activeDay);
-    var tierIds = ["S","A","B","C","D","F"];
-    var tierColors = {S:"#ff3b3b",A:"#ff8c00",B:"#f5c400",C:"#6fcc3a",D:"#00bfff",F:"#9966ff"};
-    var m1 = {}, m2 = {};
-    tierIds.concat(["unranked"]).forEach(function(tid) {
-      (t1[tid]||[]).forEach(function(a){m1[a]=tid;});
-      (t2[tid]||[]).forEach(function(a){m2[a]=tid;});
-    });
-
-    var html = '<div class="cmp-header-row"><div class="cmp-col"><div class="cmp-user-lbl">' + this.esc(u1.toUpperCase()) + '</div></div><div class="cmp-col"><div class="cmp-user-lbl">' + this.esc(u2.toUpperCase()) + '</div></div></div>';
-
-    var self = this;
-    tierIds.forEach(function(tid) {
-      var tc = tierColors[tid];
-      html += '<div class="cmp-row">';
-      [[u1, m2, t1],[u2, m1, t2]].forEach(function(pair) {
-        var om = pair[1], ct = pair[2];
-        html += '<div class="cmp-col"><div class="cmp-tier-row"><div class="cmp-tier-lbl" style="background:' + tc + '">' + tid + '</div><div class="cmp-tier-content">';
-        (ct[tid] || []).forEach(function(a) {
-          var match = om[a] === tid;
-          var c1 = ULTRA.color1(a), c2 = ULTRA.color2(a);
-          html += '<div class="cmp-chip">' +
-            '<div class="cmp-icon' + (match ? ' match' : '') + '" style="background:linear-gradient(135deg,' + c1 + ',' + c2 + ')">' + ULTRA.initials(a) + '</div>' +
-            '<div class="cmp-name">' + self.esc(a) + '</div>' +
-            '</div>';
-        });
-        html += '</div></div></div>';
-      });
-      html += '</div>';
-    });
-
-    wrap.innerHTML = html;
-  },
-};
+// ═══════════════════════ BOOT ═══════════════════════
+APP.loadUser();
+renderHome();
