@@ -1365,6 +1365,15 @@ function renderQP() {
   gid('qpSkip').onclick = function() { APP.qpIdx++; renderQP(); };
   gid('qpSwitchTier').onclick = goTierList;
 
+  // Always restore arena HTML in case it was replaced by the "done" screen
+  var arena = gid('qpArena');
+  if (!gid('qpLeft')) {
+    arena.innerHTML =
+      '<div class="qp-side" id="qpLeft"><div class="qp-card" id="qpCardL"></div><div class="qp-tap-hint">TAP TO PICK</div></div>' +
+      '<div class="qp-vs">VS</div>' +
+      '<div class="qp-side" id="qpRight"><div class="qp-card" id="qpCardR"></div><div class="qp-tap-hint">TAP TO PICK</div></div>';
+  }
+
   var q = APP.qpQueue;
   var i = APP.qpIdx;
   var prog = gid('qpProgress');
